@@ -1,85 +1,167 @@
 <?php
 
+namespace Pli;
 
-class Command
+function dump(App &$app)
 {
-    public string $prog;
-    public string $name;
-    private array $args = [];
-    private array $flags = [];
-
-    public function __construct(string $prog, string $name)
-    {
-        $this->prog = $prog;
-        $this->name = $name;
-    }
-
-    public function add_arg(string $arg)
-    {
-        $this->args[] = $arg;
-    }
-
-    public function add_flag(string $flag)
-    {
-        $this->flags[] = $flag;
-    }
-
-    public function stringify(): string
-    {
-        return "
-PROG: {$this->prog}
-COMMAND: {$this->name} 
-ARGS:
-\t" . join("\n\t", $this->args)
-            . "
-FLAGS:
-\t" . join("\n\t", $this->flags)
-            . "\n";
-    }
-
-    /**
-     * Return the context of the command
-     * 
-     * @return array{args: array<string>, flags: array<string>}
-     */
-    public function ctx()
-    {
-        return [
-            'args' => $this->args,
-            'flags' => $this->flags
-        ];
-    }
+    print_r($app);
 }
 
-function parse_args(string $input, Command &$cmd)
+function default_help(App &$app)
 {
-    $input = trim($input);
-    if ($input === "") {
+    print "TODO: Implement the auto help function\n";
+}
+
+function parse_command_line(App &$app, int $argc, array $argv)
+{
+    $app->prog_path = $argv[0];
+    array_shift($argv);
+
+    if ($argc < 2) {
         return;
     }
 
-    $parts = explode(" ", $input);
-    foreach ($parts as $part) {
-        if ($part[0] === "-") {
-            $cmd->add_flag($part);
-        } else {
-            $cmd->add_arg($part);
+    // PARSE GROUP
+    if (isset($app->groups[$argv[0]])) {
+        $app->group = &$app->groups[$argv[0]]->name_id;
+        array_shift($argv);
+    }
+
+    // PARSE COMMAND
+    if ($app->group && $argc < 3) {
+        return;
+    }
+
+    if (!$app->group) {
+        $app->group = "default";
+    }
+
+    if (isset($app->groups[$app->group]->commands[$argv[0]])) {
+        $app->command = &$app->groups[$app->group]->commands[$argv[0]]->name_id;
+        array_shift($argv);
+    }
+
+    // PARSE FLAGS AND ARGS
+}
+
+class App
+{
+    public string $prog_path;
+    /**
+     * @var array<string, Group>
+     */
+    public array $groups = [];
+
+    public ?string $group = null;
+    public ?string $command = null;
+    /**
+     * @var array<string>
+     */
+    public array $args;
+    /**
+     * @var array<string, mixed>
+     */
+    public array $flags;
+
+    // TODO: function for set default command
+    // TODO: function for override default help command
+
+    public function __construct()
+    {
+        $this->groups['default'] = new Group('default');
+        $this->add_command(new Command('help', fn () => default_help($this)));
+    }
+
+    public function add_group(Group $group)
+    {
+        // Check if group already exists
+        if (isset($this->groups[$group->name_id])) {
+            throw new \Exception('Group already exists');
         }
+
+        // Check if command already exists in default group
+        if (isset($this->groups['default']->commands[$group->name_id])) {
+            throw new \Exception('Command with this name already exists');
+        }
+
+        $this->groups[$group->name_id] = $group;
+    }
+
+    public function add_command(Command $command)
+    {
+        // Check if command already exists
+        if (isset($this->groups[$command->name_id])) {
+            throw new \Exception('Command already exists');
+        }
+
+        // Check if exist a group with this name
+        if (isset($this->groups[$command->name_id])) {
+            throw new \Exception('Group with this name already exists');
+        }
+
+        $l_default = &$this->groups['default'];
+        $l_default->add_command($command);
+    }
+
+    public function run(int $argc, array $argv)
+    {
+        parse_command_line($this, $argc, $argv);
+
+        // TODO: Exec the default command, not the help
+        if (!$this->command) {
+            $this->groups['default']->commands['help']->run();
+            return;
+        }
+
+        $this->groups[$this->group]->commands[$this->command]->run();
     }
 }
 
-function parse_command_line(string $line): Command|Error
+class Command
 {
-    $line = trim($line);
+    public string $name_id;
+    /**
+     * @var callable
+     */
+    private $callback;
 
-    [$prog, $command, $args] = explode(" ", $line, 3);
-    if ($command === "") {
-        return new Error("No command provided");
+    public function __construct(string $name_id, callable $callback)
+    {
+        $this->name_id = $name_id;
+        $this->callback = $callback;
     }
 
-    $cmd = new Command($prog, $command);
+    public function run()
+    {
+        ($this->callback)();
+    }
+}
 
-    parse_args($args, $cmd);
+class Group
+{
+    public string $name_id;
+    /**
+     * @var array<Command> `name_id` => `Command`
+     */
+    public array $commands = [];
 
-    return $cmd;
+    public function add_command(Command $command)
+    {
+        // Check if command already exists
+        if (isset($this->commands[$command->name_id])) {
+            throw new \Exception('Command already exists');
+        }
+
+        $this->commands[$command->name_id] = $command;
+    }
+
+    /**
+     * @param string $name_id
+     * @param array<Command> $commands
+     */
+    public function __construct(string $name_id, array $commands = [])
+    {
+        $this->name_id = $name_id;
+        $this->commands = $commands;
+    }
 }
