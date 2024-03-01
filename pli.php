@@ -9,7 +9,22 @@ function dump(App &$app)
 
 function default_help(App &$app)
 {
-    print "TODO: Implement the auto help function\n";
+    print "USAGE: {$app->prog_path} <GROUP> <COMMAND> [OPTIONS] [ARGS]...\n";
+    print "\n";
+    print "  Welcome to {$app->prog_name}! This tool helps you manage your tasks effortlessly.\n";
+    print "\n";
+
+    print "Commands:\n";
+    foreach ($app->groups as $group) {
+        if ($group->name_id !== 'default') {
+            print "  {$group->name_id}\n";
+        }
+
+        foreach ($group->commands as $command) {
+            print "    {$command->name_id}  {$command->description}\n";
+        }
+    }
+    print "\n";
 }
 
 function parse_command_line(App &$app, int $argc, array $argv)
@@ -47,6 +62,8 @@ function parse_command_line(App &$app, int $argc, array $argv)
 class App
 {
     public string $prog_path;
+    public string $prog_name;
+
     /**
      * @var array<string, Group>
      */
@@ -66,10 +83,11 @@ class App
     // TODO: function for set default command
     // TODO: function for override default help command
 
-    public function __construct()
+    public function __construct(string $name)
     {
-        $this->groups['default'] = new Group('default');
-        $this->add_command(new Command('help', fn () => default_help($this)));
+        $this->prog_name = $name;
+        $this->groups['default'] = new Group('default', "Default Group");
+        $this->add_command(new Command('help', 'Help', fn () => default_help($this)));
     }
 
     public function add_group(Group $group)
@@ -120,14 +138,17 @@ class App
 class Command
 {
     public string $name_id;
+    public string $description;
+
     /**
      * @var callable
      */
     private $callback;
 
-    public function __construct(string $name_id, callable $callback)
+    public function __construct(string $name_id, string $description, callable $callback)
     {
         $this->name_id = $name_id;
+        $this->description = $description;
         $this->callback = $callback;
     }
 
@@ -140,10 +161,23 @@ class Command
 class Group
 {
     public string $name_id;
+    public string $description;
+
     /**
      * @var array<Command> `name_id` => `Command`
      */
     public array $commands = [];
+
+    /**
+     * @param string $name_id
+     * @param array<Command> $commands
+     */
+    public function __construct(string $name_id, string $description, array $commands = [])
+    {
+        $this->name_id = $name_id;
+        $this->description = $description;
+        $this->commands = $commands;
+    }
 
     public function add_command(Command $command)
     {
@@ -153,15 +187,5 @@ class Group
         }
 
         $this->commands[$command->name_id] = $command;
-    }
-
-    /**
-     * @param string $name_id
-     * @param array<Command> $commands
-     */
-    public function __construct(string $name_id, array $commands = [])
-    {
-        $this->name_id = $name_id;
-        $this->commands = $commands;
     }
 }
