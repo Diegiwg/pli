@@ -139,6 +139,7 @@ class Command
 {
     public string $name_id;
     public string $description;
+    public string $usage;
 
     /**
      * @var callable
@@ -150,6 +151,11 @@ class Command
         $this->name_id = $name_id;
         $this->description = $description;
         $this->callback = $callback;
+    }
+
+    public function set_usage(string $usage)
+    {
+        $this->usage = $usage;
     }
 
     public function run()
