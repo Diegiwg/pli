@@ -163,9 +163,10 @@ class Group
     public string $name_id;
     public string $description;
 
-    /**
-     * @var array<Command> `name_id` => `Command`
-     */
+    /** @var callable */
+    public $callback;
+
+    /** @var array<Command> `name_id` => `Command` */
     public array $commands = [];
 
     /**
@@ -187,5 +188,10 @@ class Group
         }
 
         $this->commands[$command->name_id] = $command;
+    }
+
+    public function set_default_callback(callable $callback)
+    {
+        $this->callback = $callback;
     }
 }
